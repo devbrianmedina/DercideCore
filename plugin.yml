@@ -3,3 +3,4 @@ main: com.dercide.core.Main
 author: DevBrianMedina
 version: 1.0
 api: 1.0.0
+load: POSTWORLD

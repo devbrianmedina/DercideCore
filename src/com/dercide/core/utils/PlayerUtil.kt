@@ -1,11 +1,13 @@
 package com.dercide.core.utils
 
 import cn.nukkit.Player
-import cn.nukkit.Server
 import cn.nukkit.block.Block
+import cn.nukkit.block.BlockAir
+import cn.nukkit.block.BlockWater
 import cn.nukkit.level.Location
 import cn.nukkit.level.Position
 import cn.nukkit.math.Vector3
+import cn.nukkit.network.protocol.PlaySoundPacket
 import cn.nukkit.network.protocol.UpdateBlockPacket
 import cn.nukkit.utils.Config
 import com.dercide.core.Main
@@ -13,14 +15,81 @@ import me.iwareq.scoreboard.Scoreboard
 import me.iwareq.scoreboard.packet.data.DisplaySlot
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 import kotlin.math.*
 import kotlin.random.Random
 
 
 class PlayerUtil {
     companion object {
-        val server = Server.getInstance()
         fun setNameTag(pl: Player){
+        }
+
+        fun addRadiation(p:Player){
+            //Main.global.play(Main.global.playlist!![1]!!, arrayOf(p))
+            playSound(p, "radiation")
+            p.sendPopup("§4Estás en contacto con la radiacion", "§4Puedes entrar al agua")
+            CompletableFuture.runAsync {
+                Thread.sleep(3000)
+                if(isInWater(p)){
+                    p.attack(0.5f)
+                }
+                Thread.sleep(3000)
+                if(isInWater(p)){
+                    p.attack(0.5f)
+                }
+                Thread.sleep(3000)
+                if(isInWater(p)){
+                    p.attack(0.5f)
+                }
+            }
+            Main.scheduler.schedule(
+                {
+                    //comprobar si esta en sona radeoactiva para añadir de nuevo
+                    p.sendPopup("§4Ahora estás a salvo de la radiación")
+                }, /*Main.global.playlist!![1]!!.duration*/10000, TimeUnit.MILLISECONDS
+            )
+        }
+
+        fun playSound(p:Player, name:String){
+            val pk = PlaySoundPacket()
+            pk.name = name
+            pk.pitch = 1f
+            pk.volume = 1f
+            pk.x = p.floorX
+            pk.y = p.floorY
+            pk.z = p.floorZ
+            p.dataPacket(pk)
+        }
+
+        fun isInWater(p: Player): Boolean {
+            for (b in p.getCollisionBlocks()) {
+                if (b is BlockWater) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        fun canSeeSky(p: Player): Boolean {
+            for (i in p.y.toInt() + 1..255) {
+                if (p.getLevel().getBlock(p.x.toInt(), i, p.z.toInt(), false) !is BlockAir) {
+                    return false
+                }
+            }
+            return true
+        }
+
+        fun isInACave(p: Player): Boolean {
+            val y = p.y
+            if(y < 63){
+                for(i in y.toInt()..63){
+                    if(p.getLevel().getBlock(p.x.toInt(), i, p.z.toInt(), false).id == Block.STONE){
+                        return true
+                    }
+                }
+            }
+            return false
         }
 
         fun sendScoreBoard(p:Player){
@@ -31,7 +100,7 @@ class PlayerUtil {
                 score.addLine("§4§l> §fTiempo límite")
                 score.addLine("  §5§l${getTime(p)}")
                 score.addLine("§4§l> §fPvP")
-                score.addLine("  §6§lDesactivado")
+                score.addLine("  §6§l${getPvP()}")
                 score.addLine("§4§l> §fIp")
                 score.addLine("  §6§lextr.dercide.com")
             }
@@ -44,11 +113,15 @@ class PlayerUtil {
         }
 
         private fun getTime(p:Player): String{
-            val seconds = Main.time[p.uniqueId]!!
+            val seconds = Main.time[p.name]!!
             val hours = seconds / 3600
             val minutes = (seconds % 3600) / 60
             val secs = (seconds % 3600) % 60
             return "${hours}h ${minutes}m ${secs}s"
+        }
+
+        private fun getPvP(): String {
+            return if(Main.pvp) { "Activado" } else { "Desactivado" }
         }
 
         fun playerRandomTeleport(p: Player){
@@ -78,7 +151,7 @@ class PlayerUtil {
                 }
                 val randomLocation = Location(x + 0.5, y.toDouble(), z + 0.5, Main.world)
                 when(Main.world.getBlockIdAt(x, y - 1, z)){
-                    Block.WATER, Block.WATER_LILY, Block.STILL_WATER, Block.LAVA, Block.STILL_LAVA -> {
+                    Block.FLOWING_WATER, Block.WATERLILY, Block.STILL_WATER, Block.FLOWING_LAVA, Block.STILL_LAVA, Block.LAVA_CAULDRON -> {
                         playerRandomTeleport(p)
                     }
                     else -> {

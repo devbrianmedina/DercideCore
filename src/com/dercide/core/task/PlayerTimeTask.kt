@@ -10,7 +10,7 @@ class PlayerTimeTask : Task() {
         Main.time.forEach { (key, value) ->
             Main.time[key] = value - 1
             if(value <= 0){
-                Server.getInstance().getPlayer(key).get().kick("§4Tiempo agotado vuelve mañana")
+                Server.getInstance().getPlayer(key).kick("§4Tiempo agotado vuelve mañana")
             }
         }
     }

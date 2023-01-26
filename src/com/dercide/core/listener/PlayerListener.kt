@@ -3,7 +3,6 @@ package com.dercide.core.listener
 import cn.nukkit.Player
 import cn.nukkit.Server
 import cn.nukkit.block.Block
-import cn.nukkit.blockentity.BlockEntityChest
 import cn.nukkit.entity.Entity
 import cn.nukkit.entity.EntityLiving
 import cn.nukkit.event.EventHandler
@@ -11,17 +10,15 @@ import cn.nukkit.event.Listener
 import cn.nukkit.event.entity.EntityDamageByBlockEvent
 import cn.nukkit.event.entity.EntityDamageByEntityEvent
 import cn.nukkit.event.entity.EntityDamageEvent
+import cn.nukkit.event.entity.ProjectileHitEvent
 import cn.nukkit.event.player.*
-import cn.nukkit.item.Item
 import cn.nukkit.item.ItemID
 import cn.nukkit.lang.TranslationContainer
 import cn.nukkit.level.ParticleEffect
 import cn.nukkit.math.NukkitRandom
-import cn.nukkit.math.Vector3
 import cn.nukkit.network.protocol.EntityEventPacket
 import cn.nukkit.network.protocol.LevelEventPacket
 import cn.nukkit.potion.Effect
-import cn.nukkit.utils.Binary.hexStringToBytes
 import cn.nukkit.utils.Config
 import com.dercide.core.Main
 import com.dercide.core.custom.entity.Grave
@@ -72,14 +69,14 @@ class PlayerListener : Listener {
             config.set("name", p.name)
             config.set("lives", 3)
             config.set("date", date.toString())
-            config.set("time", 21600)
+            config.set("time", (21600).toLong())
             config.set("lastdeath.active", false)
             config.set("lastdeath.location", null)
             config.save()
         }
         val time = config.getLong("time")
         if(time > 0){
-            Main.time[p.uniqueId] = time
+            Main.time[p.name] = time
         } else {
             p.kick("§4Tiempo agotado vuelve mañana")
         }
@@ -98,9 +95,16 @@ class PlayerListener : Listener {
     fun onPlayerQuit(e: PlayerQuitEvent) {
         val p = e.player
         val config = Config(File("${Main.getPluginPath(Main.name)}players/${p.uniqueId}.yml"), Config.YAML)
-        config.set("time", Main.time[p.uniqueId])
+        config.set("time", Main.time[p.name])
         config.save()
-        Main.time.remove(p.uniqueId)
+        Main.time.remove(p.name)
+    }
+
+    @EventHandler
+    fun onProjectileHitEvent(e: ProjectileHitEvent){
+        if(!Main.pvp){
+            e.setCancelled()
+        }
     }
 
     @EventHandler
@@ -134,6 +138,16 @@ class PlayerListener : Listener {
 
         if (e.entity is Player) {
             val p = e.entity as Player
+            if(!Main.pvp){
+                if(e is EntityDamageByEntityEvent){
+                    if(e.damager is Player){
+                        e.setCancelled()
+                        (e.damager as Player).sendPopup("§4PvP Desactivado")
+                        return
+                    }
+                }
+            }
+
             if (p.health - e.finalDamage < 1.0f) {
                 if (e.cause != EntityDamageEvent.DamageCause.VOID && e.cause != EntityDamageEvent.DamageCause.SUICIDE) {
                     var totem = false
@@ -161,7 +175,7 @@ class PlayerListener : Listener {
                         return
                     }
                 }
-                val dmsg: Boolean = true
+                val dmsg = true
                 var msg = ""
                 val params: MutableList<String> = ArrayList()
                 if (dmsg) {
@@ -171,7 +185,7 @@ class PlayerListener : Listener {
                             val ent: Entity = e.damager
                             if (ent is Player) {
                                 msg = "death.attack.player"
-                                params.add((ent as Player).displayName)
+                                params.add(ent.displayName)
                             } else if (ent is EntityLiving) {
                                 msg = "death.attack.mob"
                                 params.add(
@@ -191,7 +205,7 @@ class PlayerListener : Listener {
                             when (ent) {
                                 is Player -> {
                                     msg = "death.attack.arrow"
-                                    params.add((ent as Player).displayName)
+                                    params.add(ent.displayName)
                                 }
 
                                 is EntityLiving -> {
@@ -234,7 +248,7 @@ class PlayerListener : Listener {
                             val ent: Entity = e.damager
                             if (ent is Player) {
                                 msg = "death.attack.explosion.player"
-                                params.add((ent as Player).displayName)
+                                params.add(ent.displayName)
                             } else if (ent is EntityLiving) {
                                 msg = "death.attack.explosion.player"
                                 params.add(

@@ -12,10 +12,13 @@ import com.dercide.core.commands.CoreComands
 import com.dercide.core.custom.entity.Grave
 import com.dercide.core.listener.PlayerListener
 import com.dercide.core.task.PlayerTimeTask
+import com.dercide.core.task.PvPTask
+import com.dercide.core.task.RadiationTask
 import java.io.File
-import java.lang.reflect.InvocationTargetException
-import java.util.*
+import java.util.concurrent.Executors
+import kotlin.collections.HashMap
 import cn.nukkit.utils.TextFormat as TF
+
 
 class Main : PluginBase() {
 
@@ -30,7 +33,13 @@ class Main : PluginBase() {
         var pos1 = hashMapOf<Int, Position>()
         var pos2 = hashMapOf<Int, Position>()
         var borders: HashMap<Int, Set<Vector3>> = hashMapOf()
-        var time:HashMap<UUID, Long> = hashMapOf()
+        var time:HashMap<String, Long> = hashMapOf()
+        var pvp = false
+        val scheduler = Executors.newSingleThreadScheduledExecutor { task: Runnable? ->
+            val thread = Thread(task, "Radiation")
+            thread.isDaemon = true
+            thread
+        }
     }
 
     override fun onLoad() {
@@ -60,6 +69,11 @@ class Main : PluginBase() {
         enableListeners()
         registerCommands()
         registerTasks()
+        /*try {
+            RadioEnable()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }*/
     }
 
     private fun enableListeners(){
@@ -72,6 +86,8 @@ class Main : PluginBase() {
 
     private fun registerTasks(){
         server.scheduler.scheduleRepeatingTask(PlayerTimeTask(), 20)
+        server.scheduler.scheduleRepeatingTask(PvPTask(), 600)
+        server.scheduler.scheduleRepeatingTask(RadiationTask(), 18000)
     }
 
     private fun registerCustoms(){

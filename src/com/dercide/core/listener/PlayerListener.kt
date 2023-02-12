@@ -7,12 +7,15 @@ import cn.nukkit.entity.Entity
 import cn.nukkit.entity.EntityLiving
 import cn.nukkit.event.EventHandler
 import cn.nukkit.event.Listener
+import cn.nukkit.event.block.BlockBreakEvent
 import cn.nukkit.event.entity.EntityDamageByBlockEvent
 import cn.nukkit.event.entity.EntityDamageByEntityEvent
 import cn.nukkit.event.entity.EntityDamageEvent
 import cn.nukkit.event.entity.ProjectileHitEvent
 import cn.nukkit.event.player.*
+import cn.nukkit.item.ItemBread
 import cn.nukkit.item.ItemID
+import cn.nukkit.item.ItemSwordIron
 import cn.nukkit.lang.TranslationContainer
 import cn.nukkit.level.ParticleEffect
 import cn.nukkit.math.NukkitRandom
@@ -21,7 +24,7 @@ import cn.nukkit.network.protocol.LevelEventPacket
 import cn.nukkit.potion.Effect
 import cn.nukkit.utils.Config
 import com.dercide.core.Main
-import com.dercide.core.custom.entity.Grave
+import com.dercide.core.custom.block.BlockGrave
 import com.dercide.core.utils.GraveUtil
 import com.dercide.core.utils.PlayerUtil
 import idk.plugin.npc.entities.NPC_Human
@@ -29,7 +32,6 @@ import java.io.File
 import java.time.LocalDate
 import java.util.*
 import java.util.concurrent.CompletableFuture
-import kotlin.collections.ArrayList
 
 
 class PlayerListener : Listener {
@@ -46,7 +48,11 @@ class PlayerListener : Listener {
                 val splitDateCf = dateCf.split("-")
                 val lastDate = LocalDate.of(splitDateCf[0].toInt(), splitDateCf[1].toInt(), splitDateCf[2].toInt())
                 if(lastDate == date){
-                    val time = config.getLong("time")
+                    val time:Long = if(config.getString("time") != "null"){
+                        config.getLong("time")
+                    } else {
+                        21600
+                    }
                     if(time <= 0){
                         e.player.kick("§4Tiempo agotado vuelve mañana")
                     }
@@ -69,26 +75,33 @@ class PlayerListener : Listener {
             config.set("name", p.name)
             config.set("lives", 3)
             config.set("date", date.toString())
-            config.set("time", (21600).toLong())
+            config.set("time", 21600)
             config.set("lastdeath.active", false)
             config.set("lastdeath.location", null)
+            config.set("friends", listOf<String>())
             config.save()
+            val bread = ItemBread()
+            bread.setCount(10)
+            e.player.inventory.setItem(0, ItemSwordIron())
+            e.player.inventory.setItem(1, bread)
+            CompletableFuture.runAsync {
+                Thread.sleep(4000)
+                p.teleport(Main.lobby)
+            }
         }
-        val time = config.getLong("time")
+        val time:Long = if(config.getString("time") != "null"){
+            config.getLong("time")
+        } else {
+            21600
+        }
         if(time > 0){
             Main.time[p.name] = time
         } else {
             p.kick("§4Tiempo agotado vuelve mañana")
         }
         PlayerUtil.sendScoreBoard(p)
-        if(p.level.folderName != Main.lobby.level.folderName){
-            p.isFoodEnabled = true
-        } else {
-            CompletableFuture.runAsync {
-                Thread.sleep(4000)
-                p.teleport(Main.lobby)
-            }
-        }
+        p.isFoodEnabled = true
+        Main.floatingTextUtil.spawnAllText(p)
     }
 
     @EventHandler
@@ -103,10 +116,24 @@ class PlayerListener : Listener {
     @EventHandler
     fun onProjectileHitEvent(e: ProjectileHitEvent){
         if(!Main.pvp){
-            e.setCancelled()
+            if(e.entity is Player){
+                e.setCancelled()
+            }
         }
     }
 
+    @EventHandler
+    fun onDropGrave(event: BlockBreakEvent) {
+        val block = event.block
+        if(block is BlockGrave){
+            val loc = block.location
+            val xyz = "${loc.x.toInt()}${loc.y.toInt()}${loc.z.toInt()}"
+            GraveUtil.dropGrave(block.location, xyz)
+        }
+    }
+
+
+    val graveList = HashMap<String, Boolean>()
     @EventHandler
     fun handleDeath(e: EntityDamageEvent) {
         val entity = e.entity
@@ -118,15 +145,7 @@ class PlayerListener : Listener {
                 }
             }
         }
-        if(entity is Grave){
-            if(e is EntityDamageByEntityEvent){
-                if(e.damager is Player){
-                    GraveUtil.dropGrave((e.damager as Player).player, entity, entity.x.toInt(), entity.y.toInt(), entity.z.toInt())
-                    return
-                }
-            }
-        }
-        if(entity.level.folderName == Main.lobby.level.folderName){
+        if(PlayerUtil.isInSpawn(entity.location)){
             e.setCancelled()
             if(entity is Player){
                 if(e.cause == EntityDamageEvent.DamageCause.VOID){
@@ -278,10 +297,10 @@ class PlayerListener : Listener {
                 p.removeAllEffects()
                 p.extinguish()
                 val loc = p.location
-                loc.getLevel().setBlockAt(loc.x.toInt(), (loc.y - 1).toInt(), loc.z.toInt(), Block.TNT)
                 GraveUtil.saveGrave(p)
                 p.inventory.clearAll()
                 p.cursorInventory.clearAll()
+                p.offhandInventory.clearAll()
                 if (p.isSurvival || p.isAdventure) {
                     val rand = NukkitRandom()
                     var exp = p.experience * 7
@@ -304,24 +323,30 @@ class PlayerListener : Listener {
                 config.set("lastdeath.active", true)
                 config.set("lastdeath.location", listOf(loc.x, loc.z, loc.level.folderName))
                 config.save()
+                Server.getInstance().onlinePlayers.values.forEach {
+                    it.sendMessage("§l§4✖ §6${p.name} §r§6tiene §a$lives §6de 3 vidas")
+                    PlayerUtil.playSound(it, "death")
+                }
                 if(lives <= 0){
                     p.setGamemode(Player.SPECTATOR)
                     CompletableFuture.runAsync {
                         Thread.sleep(8000)
-                        p.teleport(Main.lobby, null)
-                        p.kick("§4No te quedan mas vidas vuelve el dia primero del proximo mes o visita https://mc.dercide.com")
+                        p.teleport(p.spawn, null)
+                        p.kick("§c§lNo te quedan mas vidas vuelve el dia primero del proximo mes o visita §bhttps://mc.dercide.com")
                     }
                 } else {
-                    p.teleport(Main.lobby, null)
+                    p.teleport(p.spawn, null)
+                    p.sendMessage("§eRecuerda que la última vez donde moriste fue en x: ${loc.x.toInt()} z: ${loc.z.toInt()}")
+                    val bread = ItemBread()
+                    bread.setCount(10)
+                    p.inventory.setItem(1, bread)
+                    p.inventory.setItem(0, ItemSwordIron())
+                    if(com.dercide.ultramobs.Main.bleedingPlayers.containsKey(p.uniqueId)){
+                        com.dercide.ultramobs.Main.bleedingPlayers.remove(p.uniqueId)
+                    }
                 }
                 e.isCancelled = true
             }
         }
-    }
-
-    @EventHandler
-    fun onTeleport(e: PlayerTeleportEvent){
-        val p = e.player
-        p.isFoodEnabled = (e.to.level.folderName != Main.lobby.level.folderName)
     }
 }

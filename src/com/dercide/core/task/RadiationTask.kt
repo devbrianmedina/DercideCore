@@ -8,13 +8,13 @@ import java.util.*
 class RadiationTask : Task() {
 
     override fun onRun(p0: Int) {
-        for(p in Main.world.players.values){
+        for(p in Main.lobby.level.players.values){
             var probability = 0.1
             val inWater = PlayerUtil.isInWater(p)
             if(PlayerUtil.isInACave(p)){
                 probability = 0.6
                 if(inWater){
-                    probability -= 3
+                    probability = 0.3
                 }
             }
             if(randomBoolean(probability)){

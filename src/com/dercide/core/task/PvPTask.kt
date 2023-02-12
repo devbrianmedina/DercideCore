@@ -12,11 +12,9 @@ class PvPTask : Task() {
         if(rand(0, 1) == 1){
             if(!Main.pvp){
                 Main.pvp = true
-
                 Server.getInstance().onlinePlayers.values.forEach {
                     PlayerUtil.playSound(it, "alertapvp")
                 }
-                //Main.global.play(Main.global.playlist!![0]!!, Server.getInstance().onlinePlayers.values.toTypedArray())
             }
         } else {
             if(Main.pvp){
@@ -24,7 +22,6 @@ class PvPTask : Task() {
                 Server.getInstance().onlinePlayers.values.forEach {
                     PlayerUtil.playSound(it, "alertapvp")
                 }
-                //Main.global.play(Main.global.playlist!![0]!!, Server.getInstance().onlinePlayers.values.toTypedArray())
             }
         }
     }

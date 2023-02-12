@@ -36,13 +36,6 @@ class CoreComands(name: String?) : Command(name), PluginIdentifiableCommand {
                             config.save()
                             sender.sendMessage("Se establecio el lobby")
                         }
-                        "setworld" -> {
-                            val loc = sender.location
-                            Main.world = loc.level
-                            config.set("world", loc.level.folderName)
-                            config.save()
-                            sender.sendMessage("Se establecio el mundo")
-                        }
                     }
                 }
             }

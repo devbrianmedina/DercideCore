@@ -22,32 +22,28 @@ import kotlin.random.Random
 
 class PlayerUtil {
     companion object {
-        fun setNameTag(pl: Player){
-        }
 
         fun addRadiation(p:Player){
-            //Main.global.play(Main.global.playlist!![1]!!, arrayOf(p))
             playSound(p, "radiation")
             p.sendPopup("§4Estás en contacto con la radiacion", "§4Puedes entrar al agua")
             CompletableFuture.runAsync {
                 Thread.sleep(3000)
-                if(isInWater(p)){
-                    p.attack(0.5f)
+                if(!isInWater(p)){
+                    p.attack(1f)
                 }
                 Thread.sleep(3000)
-                if(isInWater(p)){
-                    p.attack(0.5f)
+                if(!isInWater(p)){
+                    p.attack(1f)
                 }
                 Thread.sleep(3000)
-                if(isInWater(p)){
-                    p.attack(0.5f)
+                if(!isInWater(p)){
+                    p.attack(1f)
                 }
             }
             Main.scheduler.schedule(
                 {
-                    //comprobar si esta en sona radeoactiva para añadir de nuevo
                     p.sendPopup("§4Ahora estás a salvo de la radiación")
-                }, /*Main.global.playlist!![1]!!.duration*/10000, TimeUnit.MILLISECONDS
+                }, 10000, TimeUnit.MILLISECONDS
             )
         }
 
@@ -92,6 +88,15 @@ class PlayerUtil {
             return false
         }
 
+        fun isInSpawn(location: Location): Boolean {
+            val x1 = location.x
+            val z1 = location.z
+            val x2 = Main.lobby.x
+            val z2 = Main.lobby.z
+            val distance = sqrt((x2 - x1).pow(2.0) + (z2 - z1).pow(2.0))
+            return distance <= Main.lobbyRadius
+        }
+
         fun sendScoreBoard(p:Player){
             val score = Scoreboard(Main.prefix, DisplaySlot.SIDEBAR, 20)
             score.setHandler {
@@ -112,6 +117,16 @@ class PlayerUtil {
             return config.getInt("lives")
         }
 
+        fun getFriends(p:Player): List<String> {
+            return Config(File("${Main.getPluginPath(Main.name)}players/${p.uniqueId}.yml"), Config.YAML).getStringList("friends")
+        }
+
+        fun setFriends(p:Player, list:List<String>) {
+            val config = Config(File("${Main.getPluginPath(Main.name)}players/${p.uniqueId}.yml"), Config.YAML)
+            config.set("friends", list)
+            config.save()
+        }
+        
         private fun getTime(p:Player): String{
             val seconds = Main.time[p.name]!!
             val hours = seconds / 3600
@@ -136,21 +151,22 @@ class PlayerUtil {
                     z = pair.second.roundToInt()
                 }
                 var y = Random.nextInt(256 - 50) + 50
-                val base = Position(x.toDouble(), y.toDouble(), z.toDouble(), Main.world)
+                val world = Main.lobby.level
+                val base = Position(x.toDouble(), y.toDouble(), z.toDouble(), world)
                 val cx = base.chunkX
                 val cz = base.chunkZ
                 while (!base.getLevel().isChunkGenerated(cx, cz) || !base.getLevel().isChunkLoaded(cx, cz)) {
                     base.getLevel().generateChunk(cx, cz, true)
                     base.getLevel().loadChunk(cx, cz, true)
                 }
-                while (Main.world.getBlock(x, y, z).id == Block.AIR && Main.world.getBlock(x, y + 1, z).id == Block.AIR){
+                while (world.getBlock(x, y, z).id == Block.AIR && world.getBlock(x, y + 1, z).id == Block.AIR){
                     y--
                 }
-                while (Main.world.getBlockIdAt(x, y, z) != Block.AIR || Main.world.getBlock(x, y + 1, z).id != Block.AIR){
+                while (world.getBlockIdAt(x, y, z) != Block.AIR || world.getBlock(x, y + 1, z).id != Block.AIR){
                     y++
                 }
-                val randomLocation = Location(x + 0.5, y.toDouble(), z + 0.5, Main.world)
-                when(Main.world.getBlockIdAt(x, y - 1, z)){
+                val randomLocation = Location(x + 0.5, y.toDouble(), z + 0.5, world)
+                when(world.getBlockIdAt(x, y - 1, z)){
                     Block.FLOWING_WATER, Block.WATERLILY, Block.STILL_WATER, Block.FLOWING_LAVA, Block.STILL_LAVA, Block.LAVA_CAULDRON -> {
                         playerRandomTeleport(p)
                     }
@@ -159,7 +175,7 @@ class PlayerUtil {
                         p.sendMessage("Has sido teletransportado a $x $y $z")
                         if(config.getBoolean("lastdeath.active")) {
                             val list = config.getList("lastdeath.location")
-                            p.sendMessage("Recuerda que la última vez donde moriste fue en x: ${list[0]} z: ${list[1]}")
+                            p.sendMessage("§eRecuerda que la última vez donde moriste fue en x: ${list[0].toString().toInt()} z: ${list[1].toString().toInt()}")
                             config.set("lastdeath.active", false)
                             config.save()
                         }

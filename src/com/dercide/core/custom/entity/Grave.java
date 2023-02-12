@@ -31,4 +31,9 @@ public class Grave extends Entity implements CustomEntity {
     public String getOriginalName() {
         return "grave";
     }
+
+    @Override
+    public int getMaxHealth() {
+        return 1;
+    }
 }

@@ -7,9 +7,9 @@
     "redstoneluckyblock": {
       "textures": "textures/blocks/redstoneluckyblock"
     },
-    "blue_mahoe_planks": {
+    "grave": {
       "textures": [
-        "textures/blocks/blue_mahoe_planks"
+        "textures/blocks/grave"
       ]
     }
   }
